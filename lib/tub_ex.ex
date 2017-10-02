@@ -7,7 +7,6 @@ defmodule TubEx do
   end
 
   def api_key do
-    config()[:api_key] ||
-      System.get_env("YOUTUBE_API_KEY")
+    config()[:api_key] || System.get_env("YOUTUBE_API_KEY")
   end
 end

@@ -7,8 +7,11 @@ defmodule TubEx.Playlist do
     Type that represents TubEx.Playlist struct.
   """
   @type t :: %TubEx.Playlist{
+    id: charlist,
+    kind: charlist,
     title: charlist,
     etag: charlist,
+    resource_id: charlist,
     playlist_id: charlist,
     channel_id: charlist,
     channel_title: charlist,
@@ -17,8 +20,11 @@ defmodule TubEx.Playlist do
     thumbnails: map,
   }
   defstruct [
+    id: nil,
+    kind: nil,
     title: nil,
     etag: nil,
+    resource_id: nil,
     playlist_id: nil,
     channel_id: nil,
     channel_title: nil,
@@ -82,8 +88,24 @@ defmodule TubEx.Playlist do
 
     case response do
       {:ok, response} ->
-        {:ok, Enum.map(response["items"], &parse!/1), page_info(response)}
+        {:ok, Enum.map(response["items"], &parse!(&1, :playlist)), page_info(response)}
       err -> err
+    end
+  end
+
+  def get_items(playlist_id, opts \\ []) do
+    defaults = [
+      key: TubEx.api_key(),
+      part: "snippet",
+      maxResults: 20,
+      playlistId: playlist_id
+    ]
+
+    case api_request("/playlistItems", Keyword.merge(defaults, opts)) do
+      {:ok, response} ->
+        {:ok, Enum.map(response["items"], &(parse!(&1, :songs))), page_info(response)}
+      err ->
+        err
     end
   end
 
@@ -101,15 +123,16 @@ defmodule TubEx.Playlist do
     })
   end
 
-  defp parse!(body) do
-    case parse(body) do
+  defp parse!(body, type) do
+    case parse(body, type) do
       {:ok, playlist} -> playlist
       {:error, body} ->
         raise "Parse error occured! #{Poison.Encoder.encode(body, %{})}"
     end
   end
 
-  defp parse(%{"snippet" => snippet, "etag" => etag, "id" => %{"playlistId" => playlist_id}}) do
+  defp parse(%{"snippet" => snippet, "etag" => etag, "id" => %{"playlistId" => playlist_id}},
+            :playlist) do
     {:ok,
       %TubEx.Playlist{
         etag: etag,
@@ -120,6 +143,25 @@ defmodule TubEx.Playlist do
         channel_id: snippet["channelId"],
         description: snippet["description"],
         playlist_id: playlist_id
+      }
+    }
+  end
+
+  defp parse(%{"etag" => etag, "id" => id, "kind" => kind, "snippet" => snippet},
+            :songs) do
+    {:ok,
+      %TubEx.Playlist{
+        etag: etag,
+        kind: kind,
+        id: id,
+        channel_id: snippet["channelId"],
+        channel_title: snippet["channelTitle"],
+        description: snippet["description"],
+        playlist_id: snippet["playlistId"],
+        published_at: snippet["publishedAt"],
+        resource_id: snippet["resourceId"],
+        thumbnails: snippet["thumbnails"],
+        title: snippet["title"]
       }
     }
   end
